@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M.Sc. Life Tracker — Universität Paderborn</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode"></button>
+  <div class="container">
+    <header class="header">
+      <h1 class="title">M.Sc. Life <em>Tracker</em></h1>
+      <p class="subtitle">Universität Paderborn</p>
+      <p class="intro">
+        Your master's is a finite number of weeks. Score each one honestly —
+        not to judge yourself, but to stay aware. Awareness is the first step toward making them count.
+      </p>
+    </header>
+
+    <section class="setup-card" id="setupCard">
+      <div class="setup-row">
+        <div class="setup-field">
+          <label for="programType">Programme length</label>
+          <select id="programType">
+            <option value="4">M.Sc. — 4 semesters (standard)</option>
+            <option value="5">M.Sc. — 5 semesters</option>
+            <option value="6">M.Sc. — 6 semesters</option>
+          </select>
+        </div>
+        <div class="setup-field">
+          <label for="startDate">First day of your programme</label>
+          <input type="date" id="startDate">
+        </div>
+        <button class="btn-primary" id="buildBtn">Build my calendar</button>
+      </div>
+      <p class="setup-hint">WS 2026/27: Campus Orientation from Mon 5 Oct, lectures 12 Oct 2026 – 5 Feb 2027.
+        Arriving later? Use your arrival day.</p>
+    </section>
+
+    <section class="advanced-toggle" id="advancedToggle" style="display:none;">
+      <button class="btn-text" id="advancedBtn">&#9881; Adjust individual semester dates</button>
+    </section>
+
+    <section class="advanced-panel" id="advancedPanel" style="display:none;">
+      <div id="advancedContent"></div>
+      <div class="advanced-actions">
+        <button class="btn-primary" id="saveOverrides">Save &amp; rebuild</button>
+        <button class="btn-secondary" id="clearOverrides">Clear all overrides</button>
+      </div>
+    </section>
+
+    <section class="stats-bar" id="statsBar" style="display:none;">
+      <div class="stat-card">
+        <span class="stat-number" id="statElapsed">0</span>
+        <span class="stat-label">Weeks Elapsed</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-number" id="statScored">0</span>
+        <span class="stat-label">Weeks Scored</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-number" id="statAvg">—</span>
+        <span class="stat-label">Average Score</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-number" id="statRemaining">0</span>
+        <span class="stat-label">Weeks Remaining</span>
+      </div>
+    </section>
+
+    <section class="current-week-bar" id="currentWeekBar" style="display:none;">
+      <div class="cw-label">Now</div>
+      <div class="cw-details">
+        <span id="cwPeriod"></span>
+        <span class="cw-sep">·</span>
+        <span id="cwWeek"></span>
+        <span class="cw-sep">·</span>
+        <span id="cwDates"></span>
+      </div>
+    </section>
+
+    <section class="today-display" id="todayDisplay" style="display:none;">
+      <span>Today is <strong id="todayDate"></strong></span>
+    </section>
+
+    <main class="calendar-grid" id="calendarGrid"></main>
+
+    <footer class="footer" id="footer" style="display:none;">
+      <p class="quote">
+        "The measure of a meaningful master's is not perfection,
+        but the willingness to keep showing up — in the lecture hall, in the lab,
+        and in the quiet moments of honest self-reflection."
+      </p>
+      <p class="footer-note">Data is stored locally in your browser. Nothing leaves your device.</p>
+    </footer>
+  </div>
+
+  <!-- Scoring Modal -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button class="modal-close" id="modalClose" aria-label="Close">&times;</button>
+      <h3 class="modal-title" id="modalTitle"></h3>
+      <p class="modal-subtitle" id="modalSubtitle"></p>
+      <p class="modal-prompt">How productive and meaningful was this week, in your honest assessment?</p>
+      <div class="score-buttons">
+        <button class="score-btn" data-score="1"><span class="score-num">1</span><span
+            class="score-text">Rough</span></button>
+        <button class="score-btn" data-score="2"><span class="score-num">2</span><span
+            class="score-text">Low</span></button>
+        <button class="score-btn" data-score="3"><span class="score-num">3</span><span
+            class="score-text">Okay</span></button>
+        <button class="score-btn" data-score="4"><span class="score-num">4</span><span
+            class="score-text">Good</span></button>
+        <button class="score-btn" data-score="5"><span class="score-num">5</span><span
+            class="score-text">Great</span></button>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-text" id="clearScore" style="display:none;">Clear score</button>
+        <button class="btn-secondary" id="cancelModal">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tooltip -->
+  <div class="tooltip" id="tooltip"></div>
+
+  <script src="calendar.js"></script>
+  <script src="script.js"></script>
+</body>
+
+</html>
