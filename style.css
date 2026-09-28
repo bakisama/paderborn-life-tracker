@@ -72,7 +72,8 @@
 
 [data-theme="dark"] .setup-field input,
 [data-theme="dark"] .setup-field select,
-[data-theme="dark"] .advanced-semesters input {
+[data-theme="dark"] .advanced-semesters input,
+[data-theme="dark"] .note-input {
   color-scheme: dark;
 }
 
@@ -497,6 +498,8 @@ body {
   padding: 2rem;
   max-width: 420px;
   width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
   box-shadow: var(--shadow-lg);
   position: relative;
 }
@@ -662,6 +665,135 @@ body {
   transform: scale(1.1);
 }
 
+/* ========== HELP BUTTON ========== */
+.help-toggle {
+  right: auto;
+  left: 1rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+/* ========== BACKUP ROW ========== */
+.backup-row {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-top: 0.6rem;
+  font-size: 0.72rem;
+  color: var(--text-light);
+}
+
+.backup-label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-right: 0.3rem;
+}
+
+/* ========== CATCH-UP NUDGE ========== */
+.nudge-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: var(--surface);
+  border: 1px dashed var(--border-dark);
+  border-radius: var(--radius);
+  padding: 0.7rem 1.2rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.82rem;
+}
+
+/* ========== WEEK NOTE ========== */
+.note-label {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.35rem;
+}
+
+.note-label span {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-light);
+}
+
+.note-input {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  resize: vertical;
+  margin-bottom: 1rem;
+}
+
+.note-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Small dot marks weeks that have a note */
+.week-square.has-note::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text);
+  box-shadow: 0 0 0 1px var(--surface);
+}
+
+/* ========== HELP MODAL ========== */
+.help-modal {
+  max-width: 520px;
+}
+
+.help-steps {
+  font-size: 0.8rem;
+  line-height: 1.6;
+  padding-left: 1.2rem;
+  margin: 0.8rem 0 1rem;
+}
+
+.help-steps li {
+  margin-bottom: 0.6rem;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  margin-top: 0.4rem;
+  color: var(--text-muted);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.legend .week-square {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+}
+
+.help-note {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-bottom: 0.8rem;
+}
+
 /* ========== RESPONSIVE ========== */
 @media (max-width: 600px) {
   .container {
@@ -677,6 +809,12 @@ body {
     align-items: stretch;
   }
 
+  .setup-field input,
+  .setup-field select {
+    width: 100%;
+    min-width: 0;
+  }
+
   .stats-bar {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -684,8 +822,8 @@ body {
   }
 
   .week-square {
-    width: 16px;
-    height: 16px;
+    width: 20px;
+    height: 20px;
   }
 
   .current-week-bar {
@@ -707,9 +845,17 @@ body {
   }
 }
 
+/* Keep the title clear of the fixed ? and theme buttons on the narrowest phones */
 @media (max-width: 380px) {
-  .week-square {
-    width: 14px;
-    height: 14px;
+  .title {
+    font-size: 1.7rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .nudge-bar {
+    flex-direction: column;
+    gap: 0.5rem;
+    text-align: center;
   }
 }

@@ -73,4 +73,31 @@ const overlapped = C.applyOverrides(periods, { s1_christmas_start: '2026-12-01' 
 const ids = C.generateWeeks(overlapped).map((w) => w.id);
 assert.equal(new Set(ids).size, ids.length);
 
+// Backup: round trip, and anything malformed is rejected before it reaches localStorage
+const state = {
+  startDate: '2026-10-05', semesters: '4',
+  scores: { '2026-10-12': 4 }, notes: { '2026-10-12': 'First week, found the Mensa' },
+  overrides: { s1_lectures_end: '2026-12-18' },
+};
+const text = JSON.stringify(C.makeBackup(state, new Date('2026-10-20T10:00:00Z')));
+assert.deepEqual(JSON.parse(JSON.stringify(C.parseBackup(text))), state);
+const bad = (patch) => assert.throws(() => C.parseBackup(JSON.stringify({ ...JSON.parse(text), ...patch })));
+bad({ app: 'something-else' });
+bad({ scores: { '2026-10-12': 7 } });
+bad({ scores: { '2026-02-30': 3 } });
+assert.throws(() => C.parseBackup(text.replace('"scores":{"2026-10-12"', '"scores":{"__proto__"')), /scores/);
+bad({ scores: [4] });
+bad({ notes: { '2026-10-12': 'x'.repeat(501) } });
+// Bad override dates are dropped, the rest of the backup still restores
+const lenient = C.parseBackup(JSON.stringify({ ...JSON.parse(text), overrides: { s1_lectures_end: '0202-10-12', s1_christmas_start: 'soon', s1_lectures_start: '2026-10-19' } }));
+assert.deepEqual({ ...lenient.overrides }, { s1_lectures_start: '2026-10-19' });
+assert.deepEqual({ ...lenient.scores }, state.scores);
+assert.equal(C.isISODate('0202-10-12'), false);
+// Overrides far outside the plan are ignored (a typo'd year must not generate ~470k weeks)
+const wild = C.applyOverrides(periods, { s4_lectureFree_end: '9999-12-31', s1_lectures_start: '1900-01-01' });
+assert.equal(C.generateWeeks(wild).length, weeks.length);
+bad({ startDate: '5 Oct' });
+assert.throws(() => C.parseBackup('not json'), /not valid JSON/);
+assert.equal(C.parseBackup(JSON.stringify({ app: 'upb-msc-life-tracker', semesters: 9 })).semesters, '4');
+
 console.log(`ok — ${weeks.length} weeks, ${periods.length} periods`);

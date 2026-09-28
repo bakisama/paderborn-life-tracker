@@ -1,5 +1,6 @@
 // ==================== Universität Paderborn academic calendar ====================
-// Pure date logic, no DOM: used by script.js in the browser and by check.js in Node.
+// Pure logic (calendar + backup file format), no DOM: used by script.js in the browser
+// and by check.js in Node.
 
 const Calendar = (function () {
   'use strict';
@@ -66,6 +67,11 @@ const Calendar = (function () {
   function parseDate(str) {
     const [y, m, d] = str.split('-').map(Number);
     return new Date(y, m - 1, d);
+  }
+
+  // A real calendar date as YYYY-MM-DD (rejects 2026-02-30, year 0202 typos, etc.)
+  function isISODate(v) {
+    return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && toISODate(parseDate(v)) === v;
   }
 
   // ---- Terms ----
@@ -162,16 +168,22 @@ const Calendar = (function () {
     return periods;
   }
 
+  // Overrides outside a year around the plan are ignored: a typo'd year would otherwise
+  // generate hundreds of thousands of weeks on every page load
   function applyOverrides(periods, overrides) {
-    return periods.map((p) => {
-      const oStart = overrides[`${p.key}_start`];
-      const oEnd = overrides[`${p.key}_end`];
-      return {
-        ...p,
-        start: oStart ? parseDate(oStart) : p.start,
-        end: oEnd ? parseDate(oEnd) : p.end,
-      };
-    });
+    if (!periods.length) return periods;
+    const lo = addWeeks(periods[0].start, -52);
+    const hi = addWeeks(periods[periods.length - 1].end, 52);
+    const pick = (value, fallback) => {
+      if (!isISODate(value)) return fallback;
+      const d = parseDate(value);
+      return d >= lo && d <= hi ? d : fallback;
+    };
+    return periods.map((p) => ({
+      ...p,
+      start: pick(overrides[`${p.key}_start`], p.start),
+      end: pick(overrides[`${p.key}_end`], p.end),
+    }));
   }
 
   // ---- Weeks ----
@@ -212,9 +224,55 @@ const Calendar = (function () {
     return weeks;
   }
 
+  // ---- Backup file ----
+  const BACKUP_APP = 'upb-msc-life-tracker';
+  const NOTE_MAX = 500;
+  const SEMESTER_CHOICES = ['4', '5', '6'];
+
+  function makeBackup({ startDate, semesters, scores, notes, overrides }, now) {
+    return {
+      app: BACKUP_APP, version: 1, exportedAt: now.toISOString(),
+      startDate, semesters, scores, notes, overrides,
+    };
+  }
+
+  // The file comes from the user's disk: validate everything before it reaches localStorage
+  function parseBackup(text) {
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      throw new Error('the file is not valid JSON');
+    }
+    if (!data || data.app !== BACKUP_APP) throw new Error('this is not an M.Sc. Life Tracker backup');
+
+    const isDate = isISODate;
+    const map = (name, value, valid) => {
+      if (value == null) return {};
+      if (typeof value !== 'object' || Array.isArray(value)) throw new Error(`"${name}" is malformed`);
+      Object.entries(value).forEach(([k, v]) => {
+        if (!valid(k, v)) throw new Error(`"${name}" has an invalid entry (${k})`);
+      });
+      return { ...value };
+    };
+
+    if (data.startDate != null && !isDate(data.startDate)) throw new Error('"startDate" is not a date');
+    return {
+      startDate: data.startDate || null,
+      semesters: SEMESTER_CHOICES.includes(String(data.semesters)) ? String(data.semesters) : '4',
+      scores: map('scores', data.scores, (k, v) => isDate(k) && Number.isInteger(v) && v >= 1 && v <= 5),
+      notes: map('notes', data.notes, (k, v) => isDate(k) && typeof v === 'string' && v.length <= NOTE_MAX),
+      // Overrides are optional date tweaks: drop bad ones rather than refuse the whole backup
+      overrides: Object.fromEntries(Object.entries(
+        data.overrides && typeof data.overrides === 'object' && !Array.isArray(data.overrides) ? data.overrides : {},
+      ).filter(([k, v]) => /^s\d+_[A-Za-z0-9]+_(start|end)$/.test(k) && isDate(v))),
+    };
+  }
+
   return {
     DEFAULT_START,
-    parseDate, toISODate, formatDate, formatDateShort,
+    parseDate, toISODate, isISODate, formatDate, formatDateShort,
     termForDate, termInfo, buildPeriods, applyOverrides, generateWeeks,
+    makeBackup, parseBackup,
   };
 })();

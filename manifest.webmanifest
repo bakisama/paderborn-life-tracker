@@ -1,0 +1,15 @@
+{
+  "name": "M.Sc. Life Tracker — Universität Paderborn",
+  "short_name": "Life Tracker",
+  "description": "Score every week of your M.Sc. at Paderborn University.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#f7f4ef",
+  "theme_color": "#1a1410",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

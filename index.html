@@ -11,9 +11,15 @@
     href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
     rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="icon-192.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="theme-color" content="#f7f4ef" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1a1a1f" media="(prefers-color-scheme: dark)">
 </head>
 
 <body>
+  <button class="theme-toggle help-toggle" id="helpBtn" aria-label="How to use">?</button>
   <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode"></button>
   <div class="container">
     <header class="header">
@@ -30,9 +36,9 @@
         <div class="setup-field">
           <label for="programType">Programme length</label>
           <select id="programType">
-            <option value="4">M.Sc. — 4 semesters (standard)</option>
-            <option value="5">M.Sc. — 5 semesters</option>
-            <option value="6">M.Sc. — 6 semesters</option>
+            <option value="4">4 semesters (standard)</option>
+            <option value="5">5 semesters</option>
+            <option value="6">6 semesters</option>
           </select>
         </div>
         <div class="setup-field">
@@ -43,6 +49,12 @@
       </div>
       <p class="setup-hint">WS 2026/27: Campus Orientation from Mon 5 Oct, lectures 12 Oct 2026 – 5 Feb 2027.
         Arriving later? Use your arrival day.</p>
+      <div class="backup-row">
+        <span class="backup-label">Backup</span>
+        <button class="btn-text" id="exportBtn">Export</button>
+        <button class="btn-text" id="importBtn">Import</button>
+        <input type="file" id="importFile" accept="application/json,.json" hidden>
+      </div>
     </section>
 
     <section class="advanced-toggle" id="advancedToggle" style="display:none;">
@@ -87,6 +99,11 @@
       </div>
     </section>
 
+    <section class="nudge-bar" id="nudgeBar" style="display:none;">
+      <span id="nudgeText"></span>
+      <button class="btn-secondary" id="nudgeBtn">Catch up</button>
+    </section>
+
     <section class="today-display" id="todayDisplay" style="display:none;">
       <span>Today is <strong id="todayDate"></strong></span>
     </section>
@@ -110,6 +127,9 @@
       <h3 class="modal-title" id="modalTitle"></h3>
       <p class="modal-subtitle" id="modalSubtitle"></p>
       <p class="modal-prompt">How productive and meaningful was this week, in your honest assessment?</p>
+      <label class="note-label" for="weekNote">Note <span>(optional, saved when you pick a score)</span></label>
+      <textarea class="note-input" id="weekNote" rows="2" maxlength="500"
+        placeholder="What happened this week?"></textarea>
       <div class="score-buttons">
         <button class="score-btn" data-score="1"><span class="score-num">1</span><span
             class="score-text">Rough</span></button>
@@ -123,8 +143,41 @@
             class="score-text">Great</span></button>
       </div>
       <div class="modal-actions">
-        <button class="btn-text" id="clearScore" style="display:none;">Clear score</button>
+        <button class="btn-text" id="clearScore" style="display:none;">Clear score &amp; note</button>
         <button class="btn-secondary" id="cancelModal">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- How-to Modal (opens on first visit, and from the ? button) -->
+  <div class="modal-overlay" id="helpOverlay">
+    <div class="modal help-modal" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+      <button class="modal-close" id="helpClose" aria-label="Close">&times;</button>
+      <h3 class="modal-title" id="helpTitle">How to use</h3>
+      <ol class="help-steps">
+        <li><strong>Set up.</strong> Pick your programme length and first day, then <em>Build my calendar</em>.</li>
+        <li><strong>Read the grid.</strong> Each square is one week, Monday to Sunday.
+          <span class="legend">
+            <span class="legend-item"><span class="week-square teaching"></span>Lectures</span>
+            <span class="legend-item"><span class="week-square break"></span>Break / exams</span>
+            <span class="legend-item"><span class="week-square current"></span>This week</span>
+            <span class="legend-item"><span class="week-square score-1"></span><span class="week-square score-3"></span><span class="week-square score-5"></span>Score 1 → 5</span>
+          </span>
+        </li>
+        <li><strong>Score each week.</strong> When a week is over, click or tap its square and rate it 1–5.
+          Add a short note if you like. Keyboard: Tab to a week, Enter, then 1–5.</li>
+        <li><strong>Catch up.</strong> Missed a few weeks? <em>Catch up</em> walks you through them, newest first.</li>
+        <li><strong>Look back.</strong> Hover over a week (or tap it on a phone) to see its dates and your note.</li>
+        <li><strong>Back up.</strong> Your data lives only in this browser. <em>Export</em> a backup now and then;
+          <em>Import</em> restores it on any device.</li>
+      </ol>
+      <p class="help-note">Dates follow the official NRW / Uni Paderborn calendar. <em>(est.)</em> means not published yet;
+        adjust any date under &#9881; Adjust individual semester dates.</p>
+      <p class="help-note">On iPhone, use Share &rarr; Add to Home Screen. Safari can delete a site's data if you don't open it
+        for 7 days; the Home Screen app is exempt but keeps separate data, so move it over with Export / Import.</p>
+      <div class="modal-actions">
+        <span></span>
+        <button class="btn-primary" id="helpDone">Got it</button>
       </div>
     </div>
   </div>

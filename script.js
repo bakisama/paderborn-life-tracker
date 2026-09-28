@@ -1,12 +1,12 @@
 // ==================== M.Sc. Life Tracker — Universität Paderborn ====================
-// UI only. Semester dates and week generation live in calendar.js.
+// UI only. Semester dates, week generation and the backup format live in calendar.js.
 
 (function () {
   'use strict';
 
   const {
-    parseDate, toISODate, formatDate, formatDateShort,
-    buildPeriods, applyOverrides, generateWeeks, DEFAULT_START,
+    parseDate, toISODate, isISODate, formatDate, formatDateShort,
+    buildPeriods, applyOverrides, generateWeeks, makeBackup, parseBackup, DEFAULT_START,
   } = Calendar;
 
   // ---- Constants ----
@@ -14,12 +14,15 @@
     startDate: 'upblt-start-date',
     semesters: 'upblt-semesters',
     scores: 'upblt-scores', // { 'YYYY-MM-DD' (Monday of week): 1..5 }
+    notes: 'upblt-notes', // { 'YYYY-MM-DD' (Monday of week): 'text' }
     overrides: 'upblt-overrides',
     theme: 'upblt-theme',
+    helpSeen: 'upblt-help-seen',
   };
 
   const DEFAULT_SEMESTERS = '4';
   const SCORE_LABELS = ['', 'Rough', 'Low', 'Okay', 'Good', 'Great'];
+  const TOOLTIP_NOTE_CHARS = 90;
 
   // ---- DOM References ----
   const $ = (id) => document.getElementById(id);
@@ -34,6 +37,8 @@
   const clearOverridesBtn = $('clearOverrides');
   const statsBar = $('statsBar');
   const currentWeekBar = $('currentWeekBar');
+  const nudgeBar = $('nudgeBar');
+  const nudgeBtn = $('nudgeBtn');
   const todayDisplay = $('todayDisplay');
   const calendarGrid = $('calendarGrid');
   const footer = $('footer');
@@ -41,15 +46,20 @@
   const modalTitle = $('modalTitle');
   const modalSubtitle = $('modalSubtitle');
   const modalClose = $('modalClose');
+  const weekNote = $('weekNote');
   const clearScoreBtn = $('clearScore');
   const cancelModalBtn = $('cancelModal');
+  const helpOverlay = $('helpOverlay');
+  const helpBtn = $('helpBtn');
   const tooltip = $('tooltip');
 
   // ---- State ----
   let allWeeks = [];
   let scores = {};
+  let notes = {};
   let overrides = {};
   let currentModalWeek = null;
+  let catchingUp = false; // scoring unscored weeks one after another via "Catch up"
 
   function today() {
     const now = new Date();
@@ -95,6 +105,25 @@
     $('statScored').textContent = scored;
     $('statAvg').textContent = avg;
     $('statRemaining').textContent = remaining;
+  }
+
+  // ---- Catch-up Nudge ----
+  function unscoredPastWeeks() {
+    const now = today();
+    return allWeeks.filter((w) => w.end < now && !scores[w.id]);
+  }
+
+  function updateNudge() {
+    const count = unscoredPastWeeks().length;
+    nudgeBar.style.display = count ? 'flex' : 'none';
+    $('nudgeText').textContent = `${count} past week${count === 1 ? '' : 's'} not scored yet`;
+  }
+
+  // Newest first: the most recent weeks are the easiest to remember
+  function openNextUnscored() {
+    const pending = unscoredPastWeeks();
+    catchingUp = pending.length > 0;
+    if (catchingUp) openScoreModal(pending[pending.length - 1]);
   }
 
   // ---- Current Week Bar ----
@@ -181,10 +210,12 @@
             if (isFuture) sq.classList.add('future');
             sq.classList.add(week.isBreak ? 'break' : 'teaching');
           }
+          if (notes[week.id]) sq.classList.add('has-note');
 
-          sq.setAttribute('aria-label', tooltipText(week, isCurrent, isPast, score).replace(/\n/g, ', '));
+          const text = tooltipText(week, isCurrent, isPast, score);
+          sq.setAttribute('aria-label', text.replace(/\n/g, ', '));
 
-          // Past weeks are scoreable by mouse and keyboard
+          // Past weeks are scoreable by mouse, touch and keyboard
           if (isPast) {
             sq.tabIndex = 0;
             sq.setAttribute('role', 'button');
@@ -195,11 +226,27 @@
                 openScoreModal(week);
               }
             });
+            sq.addEventListener('focus', () => showTooltipBy(sq, text));
+            sq.addEventListener('blur', () => {
+              if (tooltipOwner === sq) hideTooltip();
+            });
+          } else {
+            // Touch has no hover: a tap on a current/future week shows its info
+            sq.addEventListener('pointerup', (e) => {
+              if (e.pointerType !== 'mouse') showTooltipBy(sq, text);
+            });
           }
 
-          sq.addEventListener('mouseenter', (e) => showTooltip(e, week, isCurrent, isPast, score));
-          sq.addEventListener('mouseleave', hideTooltip);
-          sq.addEventListener('mousemove', moveTooltip);
+          // Hover tooltip for mouse only (pointer events keep touch taps from triggering it)
+          sq.addEventListener('pointerenter', (e) => {
+            if (e.pointerType === 'mouse') showTooltipAt(e.clientX, e.clientY, text);
+          });
+          sq.addEventListener('pointermove', (e) => {
+            if (e.pointerType === 'mouse') moveTooltip(e.clientX, e.clientY);
+          });
+          sq.addEventListener('pointerleave', (e) => {
+            if (e.pointerType === 'mouse') hideTooltip();
+          });
 
           row.appendChild(sq);
         });
@@ -222,37 +269,81 @@
     } else if (isPast && score) {
       text += `\nScore: ${score}/5 (${SCORE_LABELS[score]})`;
     } else if (isPast) {
-      text += '\nClick to score';
+      text += '\nClick or tap to score';
+    }
+
+    const note = notes[week.id];
+    if (note) {
+      text += `\n“${note.length > TOOLTIP_NOTE_CHARS ? note.slice(0, TOOLTIP_NOTE_CHARS) + '…' : note}”`;
     }
     return text;
   }
 
-  function showTooltip(e, week, isCurrent, isPast, score) {
-    tooltip.textContent = tooltipText(week, isCurrent, isPast, score);
+  let tooltipOwner = null; // square the tooltip is anchored to (touch/keyboard), null for mouse hover
+
+  function showTooltip(text) {
+    tooltip.textContent = text;
     tooltip.style.whiteSpace = 'pre-line';
     tooltip.classList.add('visible');
-    moveTooltip(e);
   }
 
-  function moveTooltip(e) {
+  // Next to the mouse cursor
+  function showTooltipAt(x, y, text) {
+    tooltipOwner = null;
+    showTooltip(text);
+    moveTooltip(x, y);
+  }
+
+  function moveTooltip(x, y) {
     // Flip to the left of the cursor near the right edge so it never leaves the viewport
-    const flip = e.clientX + 12 + tooltip.offsetWidth > window.innerWidth;
-    tooltip.style.left = (flip ? e.clientX - 12 - tooltip.offsetWidth : e.clientX + 12) + 'px';
-    tooltip.style.top = (e.clientY - 10) + 'px';
+    const flip = x + 12 + tooltip.offsetWidth > window.innerWidth;
+    tooltip.style.left = Math.max(8, flip ? x - 12 - tooltip.offsetWidth : x + 12) + 'px';
+    tooltip.style.top = (y - 10) + 'px';
+  }
+
+  // Above an element (below it if there is no room), for touch and keyboard focus
+  function showTooltipBy(el, text) {
+    tooltipOwner = el;
+    showTooltip(text);
+    placeTooltipBy(el);
+  }
+
+  function placeTooltipBy(el) {
+    const r = el.getBoundingClientRect();
+    const w = tooltip.offsetWidth;
+    const h = tooltip.offsetHeight;
+    const left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), window.innerWidth - w - 8);
+    const top = r.top - h - 8 >= 8 ? r.top - h - 8 : r.bottom + 8;
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
   }
 
   function hideTooltip() {
     tooltip.classList.remove('visible');
+    tooltipOwner = null;
   }
 
-  // ---- Modal ----
+  // A tooltip opened by a tap stays until the next tap elsewhere or a scroll.
+  // A keyboard-focused square keeps its tooltip and it follows the square when focus scrolls the page.
+  document.addEventListener('pointerdown', (e) => {
+    if (!e.target.closest('.week-square')) hideTooltip();
+  });
+  window.addEventListener('scroll', () => {
+    if (tooltipOwner && tooltipOwner === document.activeElement) placeTooltipBy(tooltipOwner);
+    else hideTooltip();
+  }, { passive: true });
+
+  // ---- Score Modal ----
   function openScoreModal(week) {
     currentModalWeek = week;
     modalTitle.textContent = `${week.semesterLabel} — ${week.periodLabel}`;
-    modalSubtitle.textContent = `Week ${week.periodWeek} · ${weekRange(week)}`;
+    const left = catchingUp ? unscoredPastWeeks().length : 0;
+    modalSubtitle.textContent = `Week ${week.periodWeek} · ${weekRange(week)}` +
+      (left > 1 ? ` · ${left} to catch up` : '');
 
     const existing = scores[week.id];
-    clearScoreBtn.style.display = existing ? 'inline-block' : 'none';
+    weekNote.value = notes[week.id] || '';
+    clearScoreBtn.style.display = existing || notes[week.id] ? 'inline-block' : 'none';
 
     document.querySelectorAll('.score-btn').forEach((btn) => {
       btn.classList.toggle('active', +btn.dataset.score === existing);
@@ -270,32 +361,65 @@
     const sq = calendarGrid.querySelector(`[data-week="${currentModalWeek.id}"]`);
     currentModalWeek = null;
     if (sq) sq.focus();
+    hideTooltip();
+  }
+
+  function cancelModal() {
+    catchingUp = false;
+    closeModal();
   }
 
   function refresh() {
     renderCalendar();
     updateStats();
+    updateNudge();
   }
 
   function setScore(score) {
     if (!currentModalWeek) return;
-    scores[currentModalWeek.id] = score;
-    saveScores();
+    const id = currentModalWeek.id;
+    scores[id] = score;
+    const note = weekNote.value.trim();
+    if (note) notes[id] = note;
+    else delete notes[id];
+    saveEntries();
     refresh();
     closeModal();
+    if (catchingUp) openNextUnscored();
   }
 
   function clearScore() {
     if (!currentModalWeek) return;
     delete scores[currentModalWeek.id];
-    saveScores();
+    delete notes[currentModalWeek.id];
+    saveEntries();
     refresh();
+    catchingUp = false;
     closeModal();
   }
 
+  // ---- Help Modal ----
+  let helpOpener = null;
+
+  function openHelp(opener) {
+    helpOpener = opener || null;
+    hideTooltip();
+    helpOverlay.classList.add('active');
+    helpOverlay.querySelector('.help-modal').scrollTop = 0; // start reading at the top
+    $('helpDone').focus({ preventScroll: true });
+    localStorage.setItem(STORAGE_KEYS.helpSeen, '1');
+  }
+
+  function closeHelp() {
+    if (!helpOverlay.classList.contains('active')) return;
+    helpOverlay.classList.remove('active');
+    if (helpOpener) helpOpener.focus();
+  }
+
   // ---- LocalStorage ----
-  function saveScores() {
+  function saveEntries() {
     localStorage.setItem(STORAGE_KEYS.scores, JSON.stringify(scores));
+    localStorage.setItem(STORAGE_KEYS.notes, JSON.stringify(notes));
   }
 
   function loadJSON(key) {
@@ -321,6 +445,60 @@
       startDate: localStorage.getItem(STORAGE_KEYS.startDate),
       semesters: localStorage.getItem(STORAGE_KEYS.semesters) || DEFAULT_SEMESTERS,
     };
+  }
+
+  // ---- Backup (Export / Import) ----
+  function exportBackup() {
+    const data = makeBackup({ ...loadConfig(), scores, notes, overrides }, new Date());
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `msc-life-tracker-${toISODate(new Date())}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function importBackup(text) {
+    let data;
+    try {
+      data = parseBackup(text);
+    } catch (e) {
+      alert(`Could not import this file: ${e.message}.`);
+      return;
+    }
+
+    const hasData = Object.keys(scores).length || Object.keys(notes).length ||
+      Object.keys(overrides).length || loadConfig().startDate;
+    const incoming = Object.keys(data.scores).length;
+    if (hasData && !confirm(`Replace your current data with this backup (${incoming} scored week${incoming === 1 ? '' : 's'})? ` +
+      'Your current scores, notes, start date and custom dates will be overwritten.')) return;
+
+    // All-or-nothing: if storage fails midway (e.g. quota), put every key back as it was
+    const keys = [STORAGE_KEYS.scores, STORAGE_KEYS.notes, STORAGE_KEYS.overrides, STORAGE_KEYS.startDate, STORAGE_KEYS.semesters];
+    const before = keys.map((k) => localStorage.getItem(k));
+    try {
+      localStorage.setItem(STORAGE_KEYS.scores, JSON.stringify(data.scores));
+      localStorage.setItem(STORAGE_KEYS.notes, JSON.stringify(data.notes));
+      localStorage.setItem(STORAGE_KEYS.overrides, JSON.stringify(data.overrides));
+      if (data.startDate) saveConfig(data.startDate, data.semesters);
+    } catch (e) {
+      keys.forEach((k, i) => (before[i] == null ? localStorage.removeItem(k) : localStorage.setItem(k, before[i])));
+      alert(`Could not import this file: your browser refused to store it (${e.name}). Nothing was changed.`);
+      return;
+    }
+
+    scores = data.scores;
+    notes = data.notes;
+    overrides = data.overrides;
+    const config = loadConfig();
+    if (config.startDate) {
+      startDateInput.value = config.startDate;
+      programTypeSelect.value = config.semesters;
+    }
+    rebuildFromConfig();
   }
 
   // ---- Advanced Settings ----
@@ -370,7 +548,7 @@
     });
     const next = {};
     advancedContent.querySelectorAll('input[data-key]').forEach((inp) => {
-      if (inp.value && inp.value !== defaults[inp.dataset.key]) next[inp.dataset.key] = inp.value;
+      if (isISODate(inp.value) && inp.value !== defaults[inp.dataset.key]) next[inp.dataset.key] = inp.value;
     });
     return next;
   }
@@ -436,21 +614,60 @@
     rebuildFromConfig();
   });
 
+  $('exportBtn').addEventListener('click', exportBackup);
+  $('importBtn').addEventListener('click', () => $('importFile').click());
+  $('importFile').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    e.target.value = ''; // allow re-importing the same file
+    if (file) file.text().then(importBackup, (err) => alert(`Could not read this file (${err.name}).`));
+  });
+
+  nudgeBtn.addEventListener('click', openNextUnscored);
+
+  // Ignore the 2nd click of a double-click/tap so catch-up doesn't score the next week by accident
   document.querySelectorAll('.score-btn').forEach((btn) => {
-    btn.addEventListener('click', () => setScore(+btn.dataset.score));
+    btn.addEventListener('click', (e) => {
+      if (e.detail > 1) return;
+      setScore(+btn.dataset.score);
+    });
   });
 
   clearScoreBtn.addEventListener('click', clearScore);
-  cancelModalBtn.addEventListener('click', closeModal);
-  modalClose.addEventListener('click', closeModal);
+  cancelModalBtn.addEventListener('click', cancelModal);
+  modalClose.addEventListener('click', cancelModal);
+  onBackdropClick(modalOverlay, cancelModal);
 
-  modalOverlay.addEventListener('click', (e) => {
-    if (e.target === modalOverlay) closeModal();
-  });
+  // Close on a click that both starts and ends on the backdrop, so a text selection
+  // dragged out of the note field doesn't discard the note
+  function onBackdropClick(overlay, close) {
+    let pressedBackdrop = false;
+    overlay.addEventListener('pointerdown', (e) => {
+      pressedBackdrop = e.target === overlay;
+    });
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay && pressedBackdrop) close();
+    });
+  }
+
+  helpBtn.addEventListener('click', () => openHelp(helpBtn));
+  $('helpDone').addEventListener('click', closeHelp);
+  $('helpClose').addEventListener('click', closeHelp);
+  onBackdropClick(helpOverlay, closeHelp);
 
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeModal();
-    if (modalOverlay.classList.contains('active') && e.key >= '1' && e.key <= '5') {
+    // A held key must not score week after week during catch-up
+    if (e.repeat && modalOverlay.classList.contains('active')) {
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'Escape') {
+      cancelModal();
+      closeHelp();
+    }
+    // 1–5 scores the open week, except while typing a note or using shortcuts like Cmd+1
+    const typing = e.target === weekNote;
+    if (modalOverlay.classList.contains('active') && !typing && !e.metaKey && !e.ctrlKey && !e.altKey &&
+      e.key >= '1' && e.key <= '5' && e.key.length === 1) {
       setScore(+e.key);
     }
   });
@@ -479,12 +696,14 @@
   function init() {
     applyTheme(getPreferredTheme());
     scores = loadJSON(STORAGE_KEYS.scores);
+    notes = loadJSON(STORAGE_KEYS.notes);
     overrides = loadJSON(STORAGE_KEYS.overrides);
     const config = loadConfig();
 
     programTypeSelect.value = config.semesters;
     startDateInput.value = config.startDate || DEFAULT_START;
     if (config.startDate) buildCalendar(config.startDate, config.semesters);
+    if (!localStorage.getItem(STORAGE_KEYS.helpSeen)) openHelp();
   }
 
   init();

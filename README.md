@@ -12,11 +12,20 @@ Paderborn edition of [PG Life Tracker — IIT Hyderabad](https://github.com/baki
 - **Official dates** — NRW lecture periods (set by MKW NRW) through SS 2030 and Paderborn's WS 2026/27 Christmas break; later Christmas breaks marked *(est.)* until published
 - **Programme length** — M.Sc. standard 4 semesters, or 5 / 6 if you run over
 - **Winter or summer intake** — the calendar starts from whichever semester your first day falls in; late arrivals (visa delays) start at the arrival date
-- **Weekly scoring** — Rate each past week 1–5 by mouse or keyboard (Tab, Enter, 1–5)
+- **Weekly scoring** — Rate each past week 1–5 by mouse, touch or keyboard (Tab, Enter, 1–5)
+- **Weekly notes** — Optional one-liner per week ("what happened"), shown on hover/tap
+- **Catch up** — Shows how many past weeks are unscored and walks you through them, newest first
 - **Stats dashboard** — Weeks elapsed, scored, average score, remaining
 - **Current week indicator** — Pulsing marker + info bar
 - **Advanced settings** — Override any period's start/end date
+- **Backup** — Export all data to a JSON file, import it on any device
+- **Phone-friendly** — Tap any week for its details; installable to the home screen
+- **How-to guide** — Shown on first visit, reopen any time with the **?** button
 - **Fully local** — All data stored in localStorage, nothing leaves your device
+
+> **iPhone users:** add the site to your Home Screen (Share → Add to Home Screen). Safari can delete a
+> site's data if you don't open it for 7 days; the Home Screen app is exempt but keeps its own separate
+> data, so move existing data over with Export / Import.
 
 ## Dates used (WS 2026/27 start)
 
