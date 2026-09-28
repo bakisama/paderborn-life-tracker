@@ -2,6 +2,8 @@
 
 A week-by-week productivity tracker for master's students at Paderborn University. Score each week of your programme honestly — not to judge yourself, but to stay aware.
 
+**[Live Demo](https://paderborn-life-tracker.netlify.app)**
+
 Paderborn edition of [PG Life Tracker — IIT Hyderabad](https://github.com/bakisama/pglife-tracker).
 
 ## Features
